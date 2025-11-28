@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import DataTable from './DataTable';
-import { getConversations } from '../fakeApi';
+import { getConversations } from '../api';
 import { MessageSquare, Users } from 'lucide-react';
 
 const ConversationsView = () => {
