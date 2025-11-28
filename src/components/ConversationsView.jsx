@@ -1,103 +1,131 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import DataTable from './DataTable';
-import { getConversations } from '../api';
-import { MessageSquare, Users } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { fetchCollectionData } from "../api";
 
-const ConversationsView = () => {
-  const conversations = getConversations();
+function ConversationsView() {
+  const [data, setData] = useState({ docs: [], total: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const columns = [
-    { key: 'conversationId', label: 'ID' },
-    { 
-      key: 'participants', 
-      label: 'Participants',
-      render: (value) => (
-        <div className="flex flex-wrap gap-1">
-          {value.map((participant, index) => (
-            <Badge key={index} variant="secondary" className="text-xs">
-              {participant}
-            </Badge>
-          ))}
-        </div>
-      )
-    },
-    { 
-      key: 'participantsCount', 
-      label: 'Count',
-      render: (value) => (
-        <div className="flex items-center gap-1">
-          <Users className="w-4 h-4 text-muted-foreground" />
-          <span>{value}</span>
-        </div>
-      )
-    },
-    { key: 'lastMessage', label: 'Last Message' },
-    { key: 'lastUpdated', label: 'Last Updated' },
-  ];
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await fetchCollectionData("conversations", 1, 50);
+        setData(res);
+      } catch (err) {
+        console.error("Failed to load conversations", err);
+        setError("Failed to load conversations from MongoDB.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const docs = data.docs || [];
+  const columnKeys =
+    docs.length > 0
+      ? Array.from(
+          new Set(
+            docs.flatMap((doc) =>
+              Object.keys(doc).filter(
+                (k) => k !== "_id" && !k.startsWith("__")
+              )
+            )
+          )
+        ).slice(0, 6)
+      : [];
+
+  const formatCell = (value) => {
+    if (value == null) return "-";
+    if (typeof value === "object") {
+      try {
+        const str = JSON.stringify(value);
+        return str.length > 60 ? str.slice(0, 57) + "..." : str;
+      } catch {
+        return "[object]";
+      }
+    }
+    const str = String(value);
+    return str.length > 60 ? str.slice(0, 57) + "..." : str;
+  };
 
   return (
-    <div className="container mx-auto px-4 py-8 animate-slide-up">
-      {/* Header */}
-      <div className="mb-8">
-        <h2 className="text-4xl font-bold page-header mb-2">Conversations</h2>
-        <p className="text-muted-foreground">Manage member conversations and support</p>
+    <div className="container mx-auto px-4 py-8 space-y-6">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold">Conversations</h1>
+        <p className="text-muted-foreground text-sm">
+          Live view of documents from the <code>conversations</code>{" "}
+          collection.
+        </p>
       </div>
 
-      {/* Summary Card */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Conversations
-            </CardTitle>
-            <MessageSquare className="w-5 h-5 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{conversations.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Today
-            </CardTitle>
-            <MessageSquare className="w-5 h-5 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{conversations.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Participants
-            </CardTitle>
-            <Users className="w-5 h-5 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {conversations.reduce((sum, conv) => sum + conv.participantsCount, 0)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Conversations Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Conversations</CardTitle>
-          <CardDescription>All active conversations and messages</CardDescription>
+          <CardTitle className="text-lg">Summary</CardTitle>
+          <CardDescription className="text-xs">
+            Total documents in <code>conversations</code>:{" "}
+            <span className="font-semibold">{data.total}</span>
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={conversations} />
+          {loading ? (
+            <div className="py-6 text-sm text-muted-foreground">
+              Loading conversations…
+            </div>
+          ) : error ? (
+            <div className="py-4 text-sm text-red-200 bg-red-500/10 border border-red-500/40 rounded-lg">
+              {error}
+            </div>
+          ) : docs.length === 0 ? (
+            <div className="py-6 text-sm text-muted-foreground">
+              No conversation documents found.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border/60 text-[11px] text-muted-foreground">
+                    <th className="text-left py-2 px-3">#</th>
+                    {columnKeys.map((key) => (
+                      <th key={key} className="text-left py-2 px-3">
+                        {key}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {docs.map((doc, idx) => (
+                    <tr
+                      key={doc._id || idx}
+                      className="border-b border-border/40 last:border-0"
+                    >
+                      <td className="py-2 px-3 text-muted-foreground">
+                        {idx + 1}
+                      </td>
+                      {columnKeys.map((key) => (
+                        <td key={key} className="py-2 px-3">
+                          {formatCell(doc[key])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
-};
+}
 
 export default ConversationsView;
