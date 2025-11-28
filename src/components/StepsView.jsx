@@ -1,99 +1,130 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import DataTable from './DataTable';
-import { getDailySteps } from '../api';
-import { TrendingUp, Award } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { fetchCollectionData } from "../api";
 
-const StepsView = () => {
-  const stepsData = getDailySteps();
+function StepsView() {
+  const [data, setData] = useState({ docs: [], total: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const columns = [
-    { 
-      key: 'userName', 
-      label: 'User Name',
-      render: (value, row, index) => (
-        <div className="flex items-center gap-2">
-          {index < 3 && (
-            <Award className={`w-4 h-4 ${
-              index === 0 ? 'text-yellow-500' : 
-              index === 1 ? 'text-gray-400' : 
-              'text-orange-600'
-            }`} />
-          )}
-          <span>{value}</span>
-        </div>
-      )
-    },
-    { key: 'date', label: 'Date' },
-    { 
-      key: 'steps', 
-      label: 'Steps',
-      render: (value) => (
-        <Badge variant={value > 10000 ? 'default' : 'secondary'}>
-          {value.toLocaleString()}
-        </Badge>
-      )
-    },
-  ];
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await fetchCollectionData("dailysteps", 1, 50);
+        setData(res);
+      } catch (err) {
+        console.error("Failed to load daily steps", err);
+        setError("Failed to load daily steps from MongoDB.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
 
-  const maxSteps = Math.max(...stepsData.chartData.map(d => d.steps));
+  const docs = data.docs || [];
+  const columnKeys =
+    docs.length > 0
+      ? Array.from(
+          new Set(
+            docs.flatMap((doc) =>
+              Object.keys(doc).filter(
+                (k) => k !== "_id" && !k.startsWith("__")
+              )
+            )
+          )
+        ).slice(0, 6)
+      : [];
+
+  const formatCell = (value) => {
+    if (value == null) return "-";
+    if (typeof value === "object") {
+      try {
+        const str = JSON.stringify(value);
+        return str.length > 60 ? str.slice(0, 57) + "..." : str;
+      } catch {
+        return "[object]";
+      }
+    }
+    const str = String(value);
+    return str.length > 60 ? str.slice(0, 57) + "..." : str;
+  };
 
   return (
-    <div className="container mx-auto px-4 py-8 animate-slide-up">
-      {/* Header */}
-      <div className="mb-8">
-        <h2 className="text-4xl font-bold page-header mb-2">Daily Steps Overview</h2>
-        <p className="text-muted-foreground">Track daily step counts across all users</p>
+    <div className="container mx-auto px-4 py-8 space-y-6">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold">Daily Steps</h1>
+        <p className="text-muted-foreground text-sm">
+          Live view of documents from the <code>dailysteps</code> collection.
+        </p>
       </div>
 
-      {/* Chart Card */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            Steps This Week
-          </CardTitle>
-          <CardDescription>Last 7 days average step count</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {stepsData.chartData.map((day, index) => {
-              const percentage = (day.steps / maxSteps) * 100;
-              return (
-                <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{day.day}</span>
-                    <span className="text-muted-foreground">{day.steps.toLocaleString()} steps</span>
-                  </div>
-                  <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500 ease-out"
-                      style={{ 
-                        width: `${percentage}%`,
-                        animationDelay: `${index * 100}ms`
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Top Users Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Top Steppers</CardTitle>
-          <CardDescription>Users with highest step counts today</CardDescription>
+          <CardTitle className="text-lg">Summary</CardTitle>
+          <CardDescription className="text-xs">
+            Total records in <code>dailysteps</code>:{" "}
+            <span className="font-semibold">{data.total}</span>
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={stepsData.topUsers} />
+          {loading ? (
+            <div className="py-6 text-sm text-muted-foreground">
+              Loading daily steps…
+            </div>
+          ) : error ? (
+            <div className="py-4 text-sm text-red-200 bg-red-500/10 border border-red-500/40 rounded-lg">
+              {error}
+            </div>
+          ) : docs.length === 0 ? (
+            <div className="py-6 text-sm text-muted-foreground">
+              No daily step records found.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border/60 text-[11px] text-muted-foreground">
+                    <th className="text-left py-2 px-3">#</th>
+                    {columnKeys.map((key) => (
+                      <th key={key} className="text-left py-2 px-3">
+                        {key}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {docs.map((doc, idx) => (
+                    <tr
+                      key={doc._id || idx}
+                      className="border-b border-border/40 last:border-0"
+                    >
+                      <td className="py-2 px-3 text-muted-foreground">
+                        {idx + 1}
+                      </td>
+                      {columnKeys.map((key) => (
+                        <td key={key} className="py-2 px-3">
+                          {formatCell(doc[key])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
-};
+}
 
 export default StepsView;
