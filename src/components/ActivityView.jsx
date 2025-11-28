@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import DataTable from './DataTable';
-import { getActivities, getActivitySummary } from '../fakeApi';
+import { getActivities, getActivitySummary } from '../api';
 import { Activity, Clock, CheckCircle, Users } from 'lucide-react';
 
 const ActivityView = () => {
