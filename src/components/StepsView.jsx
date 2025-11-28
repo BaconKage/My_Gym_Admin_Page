@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import DataTable from './DataTable';
-import { getDailySteps } from '../fakeApi';
+import { getDailySteps } from '../api';
 import { TrendingUp, Award } from 'lucide-react';
 
 const StepsView = () => {
