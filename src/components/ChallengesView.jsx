@@ -1,126 +1,130 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import DataTable from './DataTable';
-import { getChallenges, getChallengeParticipants } from '../api';
-import { Trophy, Users, Calendar, TrendingUp } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { fetchCollectionData } from "../api";
 
-const ChallengesView = () => {
-  const challenges = getChallenges();
-  const [selectedChallenge, setSelectedChallenge] = useState(null);
-  const [participants, setParticipants] = useState([]);
+function ChallengesView() {
+  const [data, setData] = useState({ docs: [], total: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const handleChallengeClick = (challenge) => {
-    setSelectedChallenge(challenge);
-    setParticipants(getChallengeParticipants(challenge.id));
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await fetchCollectionData("challenges", 1, 50);
+        setData(res);
+      } catch (err) {
+        console.error("Failed to load challenges", err);
+        setError("Failed to load challenges from MongoDB.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const docs = data.docs || [];
+  const columnKeys =
+    docs.length > 0
+      ? Array.from(
+          new Set(
+            docs.flatMap((doc) =>
+              Object.keys(doc).filter(
+                (k) => k !== "_id" && !k.startsWith("__")
+              )
+            )
+          )
+        ).slice(0, 6)
+      : [];
+
+  const formatCell = (value) => {
+    if (value == null) return "-";
+    if (typeof value === "object") {
+      try {
+        const str = JSON.stringify(value);
+        return str.length > 60 ? str.slice(0, 57) + "..." : str;
+      } catch {
+        return "[object]";
+      }
+    }
+    const str = String(value);
+    return str.length > 60 ? str.slice(0, 57) + "..." : str;
   };
 
-  const participantColumns = [
-    { key: 'userName', label: 'User Name' },
-    { 
-      key: 'progress', 
-      label: 'Progress',
-      render: (value) => (
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium">{value}%</span>
-          </div>
-          <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
-              style={{ width: `${value}%` }}
-            />
-          </div>
-        </div>
-      )
-    },
-    { key: 'joinDate', label: 'Join Date' },
-  ];
-
   return (
-    <div className="container mx-auto px-4 py-8 animate-slide-up">
-      {/* Header */}
-      <div className="mb-8">
-        <h2 className="text-4xl font-bold page-header mb-2">Active Challenges</h2>
-        <p className="text-muted-foreground">Manage and track gym challenges</p>
+    <div className="container mx-auto px-4 py-8 space-y-6">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold">Challenges</h1>
+        <p className="text-muted-foreground text-sm">
+          Live view of documents from the <code>challenges</code> collection.
+        </p>
       </div>
 
-      {/* Challenges Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        {challenges.map((challenge) => (
-          <Card 
-            key={challenge.id} 
-            className="card-hover-effect cursor-pointer"
-            onClick={() => handleChallengeClick(challenge)}
-          >
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-1 flex-1">
-                  <CardTitle className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-primary" />
-                    {challenge.title}
-                  </CardTitle>
-                  <CardDescription>{challenge.description}</CardDescription>
-                </div>
-                <Badge variant="default">{challenge.status}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    <span>Start Date</span>
-                  </div>
-                  <p className="text-sm font-medium">{challenge.startDate}</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    <span>End Date</span>
-                  </div>
-                  <p className="text-sm font-medium">{challenge.endDate}</p>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-border">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Users className="w-4 h-4" />
-                    <span>Participants</span>
-                  </div>
-                  <span className="text-lg font-bold">{challenge.participants}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Participants Table */}
-      {selectedChallenge && (
-        <Card className="animate-slide-up">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5" />
-                  {selectedChallenge.title} - Participants
-                </CardTitle>
-                <CardDescription>Progress tracking for all participants</CardDescription>
-              </div>
-              <Button variant="outline" onClick={() => setSelectedChallenge(null)}>
-                Close
-              </Button>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Summary</CardTitle>
+          <CardDescription className="text-xs">
+            Total documents in <code>challenges</code>:{" "}
+            <span className="font-semibold">{data.total}</span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="py-6 text-sm text-muted-foreground">
+              Loading challenges…
             </div>
-          </CardHeader>
-          <CardContent>
-            <DataTable columns={participantColumns} data={participants} />
-          </CardContent>
-        </Card>
-      )}
+          ) : error ? (
+            <div className="py-4 text-sm text-red-200 bg-red-500/10 border border-red-500/40 rounded-lg">
+              {error}
+            </div>
+          ) : docs.length === 0 ? (
+            <div className="py-6 text-sm text-muted-foreground">
+              No challenge documents found.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border/60 text-[11px] text-muted-foreground">
+                    <th className="text-left py-2 px-3">#</th>
+                    {columnKeys.map((key) => (
+                      <th key={key} className="text-left py-2 px-3">
+                        {key}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {docs.map((doc, idx) => (
+                    <tr
+                      key={doc._id || idx}
+                      className="border-b border-border/40 last:border-0"
+                    >
+                      <td className="py-2 px-3 text-muted-foreground">
+                        {idx + 1}
+                      </td>
+                      {columnKeys.map((key) => (
+                        <td key={key} className="py-2 px-3">
+                          {formatCell(doc[key])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-};
+}
 
 export default ChallengesView;
