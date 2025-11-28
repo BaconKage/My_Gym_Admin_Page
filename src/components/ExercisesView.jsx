@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import DataTable from './DataTable';
-import { getExercises, getExerciseCategories, getExerciseLevels } from '../fakeApi';
+import { getExercises, getExerciseCategories, getExerciseLevels } from '../api';
 import { Dumbbell, Filter } from 'lucide-react';
 
 const ExercisesView = () => {
