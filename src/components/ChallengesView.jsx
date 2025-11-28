@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import DataTable from './DataTable';
-import { getChallenges, getChallengeParticipants } from '../fakeApi';
+import { getChallenges, getChallengeParticipants } from '../api';
 import { Trophy, Users, Calendar, TrendingUp } from 'lucide-react';
 
 const ChallengesView = () => {
