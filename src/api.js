@@ -11,9 +11,9 @@ export async function fetchDashboardStats() {
   try {
     const res = await api.get("/api/dashboard");
     return res.data;
-  } catch (err: any) {
+  } catch (err) {
     // fall back to /dashboard if /api/dashboard doesn't exist
-    if (err.response && err.response.status === 404) {
+    if (err && err.response && err.response.status === 404) {
       const res2 = await api.get("/dashboard");
       return res2.data;
     }
@@ -21,18 +21,19 @@ export async function fetchDashboardStats() {
   }
 }
 
-// ✅ All collection counts (now uses /api/meta)
+// Backwards compatibility alias for old code
+export async function getDashboardStats() {
+  return fetchDashboardStats();
+}
+
+// All collection counts
 export async function fetchCollectionsMeta() {
   const res = await api.get("/api/meta");
   return res.data; // [{ name: "exercises", count: 664 }, ...]
 }
 
-// ✅ Paginated docs for a specific collection (now /api/collections/...)
-export async function fetchCollectionData(
-  name: string,
-  page: number = 1,
-  limit: number = 20
-) {
+// Paginated docs for a specific collection
+export async function fetchCollectionData(name, page = 1, limit = 20) {
   const res = await api.get(
     `/api/collections/${encodeURIComponent(name)}?page=${page}&limit=${limit}`
   );
