@@ -252,4 +252,4 @@ function ActivityView() {
   );
 }
 
-export default ActivityView;
+export default ActivityView; 
