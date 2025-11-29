@@ -8,16 +8,22 @@ import {
 } from "./ui/card";
 import { fetchCollectionData } from "../api";
 
-const normalizeDate = (value) => {
-  if (!value) return null;
-  if (value.$date) return new Date(value.$date);
-  if (typeof value === "string" || value instanceof Date) return new Date(value);
-  return null;
-};
-
 const formatDateTime = (value) => {
-  const d = normalizeDate(value);
-  if (!d || isNaN(d.getTime())) return "-";
+  if (!value) return "-";
+
+  // Mongo date shape: { $date: "2025-11-28T03:38:22.366Z" } OR ISO string
+  const iso =
+    typeof value === "string"
+      ? value
+      : typeof value === "object" && value.$date
+      ? value.$date
+      : null;
+
+  if (!iso) return "-";
+
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+
   return d.toLocaleString("en-IN", {
     year: "numeric",
     month: "short",
@@ -25,12 +31,6 @@ const formatDateTime = (value) => {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
-
-const shorten = (str, max = 80) => {
-  if (!str) return "-";
-  if (str.length <= max) return str;
-  return str.slice(0, max - 3) + "...";
 };
 
 function ActivityView() {
@@ -43,7 +43,6 @@ function ActivityView() {
       try {
         setLoading(true);
         setError("");
-        // activities collection
         const res = await fetchCollectionData("activities", 1, 50);
         setData(res);
       } catch (err) {
@@ -58,101 +57,94 @@ function ActivityView() {
 
   const docs = data.docs || [];
 
-  // Flatten each document (one per user) into user-action rows
-  const rows = docs.flatMap((doc) => {
-    const userId =
-      doc.userId?._id ||
-      doc.userId?.$oid ||
-      doc.userId ||
-      doc.userid ||
-      doc.user_id;
-
+  // Build rows in a human-readable way
+  const rows = docs.map((doc) => {
     const actions = doc.actions || {};
-    return Object.entries(actions).map(([actionType, info]) => {
-      const count = info?.count ?? 0;
-      const lastActivityTime = info?.lastActivityTime;
-      const notes = Array.isArray(info?.notes) ? info.notes : [];
-      const latestNote = notes[notes.length - 1] || null;
-      const ref =
-        info?.ref?._id || info?.ref?.$oid || info?.ref || null;
-      const refType = info?.refType || null;
 
-      return {
-        userId,
-        actionType,
-        count,
-        lastActivityTime,
-        latestNote,
-        ref,
-        refType,
-        docId: doc._id?._id || doc._id?.$oid || doc._id,
-      };
-    });
+    const login = actions.Login || {};
+    const workout = actions.WorkoutPlan || {};
+    const contest = actions.Contest || {};
+    const diet = actions.DietPlan || {};
+
+    return {
+      id: doc._id || doc.userId,
+      userId: doc.userId,
+      lastUpdated: doc.lastUpdated,
+      loginCount: login.count || 0,
+      lastLoginAt: login.lastActivityTime,
+      workoutCount: workout.count || 0,
+      lastWorkoutAt: workout.lastActivityTime,
+      contestCount: contest.count || 0,
+      dietCount: diet.count || 0,
+    };
   });
 
-  // Summary stats
   const summary = rows.reduce(
     (acc, row) => {
-      if (row.userId) acc.userIds.add(String(row.userId));
-      acc.totalEvents += Number(row.count) || 0;
-      acc.actionTypes.add(row.actionType);
+      acc.users += 1;
+      acc.totalLogins += row.loginCount;
+      acc.totalWorkouts += row.workoutCount;
+      acc.totalContests += row.contestCount;
+      acc.totalDietUpdates += row.dietCount;
       return acc;
     },
     {
-      userIds: new Set(),
-      totalEvents: 0,
-      actionTypes: new Set(),
+      users: 0,
+      totalLogins: 0,
+      totalWorkouts: 0,
+      totalContests: 0,
+      totalDietUpdates: 0,
     }
   );
 
-  const totalUsersWithActivity = summary.userIds.size;
-  const totalActionTypes = summary.actionTypes.size;
-
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
-      {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">Activity Overview</h1>
         <p className="text-muted-foreground text-sm">
-          Per-user activity summary from the <code>activities</code>{" "}
-          collection. Each row below shows one type of action (Login,
-          WorkoutPlan, Contest, etc.) for a specific user.
+          High-level view of how users are interacting with MyGym (logins,
+          workouts, contests, diet plan usage).
         </p>
       </div>
 
-      {/* Summary card */}
+      {/* Summary cards */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Summary</CardTitle>
           <CardDescription className="text-xs">
-            Raw documents in <code>activities</code>:{" "}
-            <span className="font-semibold">{data.total}</span>
-            <br />
-            Flattened view below combines user &amp; action type into readable
-            rows for admins.
+            Showing up to 50 most recent activity records from{" "}
+            <code>activities</code>.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs">
           <div className="rounded-lg bg-slate-800/60 border border-slate-700/70 px-3 py-2">
             <p className="text-[11px] text-muted-foreground mb-1">
-              Users with activity
+              Users tracked
             </p>
-            <p className="text-base font-semibold">
-              {totalUsersWithActivity}
-            </p>
+            <p className="text-base font-semibold">{summary.users}</p>
           </div>
-          <div className="rounded-lg bg-blue-500/5 border border-blue-500/30 px-3 py-2">
-            <p className="text-[11px] text-blue-100 mb-1">Total events</p>
+          <div className="rounded-lg bg-blue-500/5 border border-blue-500/40 px-3 py-2">
+            <p className="text-[11px] text-blue-100 mb-1">Total logins</p>
             <p className="text-base font-semibold text-blue-200">
-              {summary.totalEvents.toLocaleString()}
+              {summary.totalLogins}
             </p>
           </div>
-          <div className="rounded-lg bg-violet-500/5 border border-violet-500/30 px-3 py-2">
-            <p className="text-[11px] text-violet-100 mb-1">
-              Different action types
+          <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/40 px-3 py-2">
+            <p className="text-[11px] text-emerald-100 mb-1">Workouts</p>
+            <p className="text-base font-semibold text-emerald-200">
+              {summary.totalWorkouts}
             </p>
-            <p className="text-base font-semibold text-violet-200">
-              {totalActionTypes}
+          </div>
+          <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/40 px-3 py-2">
+            <p className="text-[11px] text-yellow-100 mb-1">Contest events</p>
+            <p className="text-base font-semibold text-yellow-200">
+              {summary.totalContests}
+            </p>
+          </div>
+          <div className="rounded-lg bg-pink-500/5 border border-pink-500/40 px-3 py-2">
+            <p className="text-[11px] text-pink-100 mb-1">Diet plan updates</p>
+            <p className="text-base font-semibold text-pink-200">
+              {summary.totalDietUpdates}
             </p>
           </div>
         </CardContent>
@@ -161,11 +153,10 @@ function ActivityView() {
       {/* Detailed table */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">User activity breakdown</CardTitle>
+          <CardTitle className="text-sm">User activity details</CardTitle>
           <CardDescription className="text-xs">
-            One row per user per action type. Counts come from the{" "}
-            <code>actions.&lt;Type&gt;.count</code> field. The latest note is
-            taken from the action&apos;s notes array.
+            Each row is one user&apos;s activity document in{" "}
+            <code>activities</code>.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -179,7 +170,7 @@ function ActivityView() {
             </div>
           ) : rows.length === 0 ? (
             <div className="py-6 text-sm text-muted-foreground">
-              No activity records found.
+              No activity documents found.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -187,58 +178,40 @@ function ActivityView() {
                 <thead>
                   <tr className="border-b border-border/60 text-[11px] text-muted-foreground">
                     <th className="text-left py-2 px-3">#</th>
-                    <th className="text-left py-2 px-3">User</th>
-                    <th className="text-left py-2 px-3">Action type</th>
-                    <th className="text-left py-2 px-3">Count</th>
-                    <th className="text-left py-2 px-3">Last activity</th>
-                    <th className="text-left py-2 px-3">Latest note</th>
-                    <th className="text-left py-2 px-3">Ref / Type</th>
+                    <th className="text-left py-2 px-3">User ID</th>
+                    <th className="text-left py-2 px-3">Logins</th>
+                    <th className="text-left py-2 px-3">Last login</th>
+                    <th className="text-left py-2 px-3">Workouts</th>
+                    <th className="text-left py-2 px-3">Last workout</th>
+                    <th className="text-left py-2 px-3">Contests</th>
+                    <th className="text-left py-2 px-3">Diet updates</th>
+                    <th className="text-left py-2 px-3">Last updated</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row, idx) => (
                     <tr
-                      key={`${row.docId || "doc"}-${row.actionType}-${idx}`}
+                      key={row.id || idx}
                       className="border-b border-border/40 last:border-0"
                     >
                       <td className="py-2 px-3 text-muted-foreground">
                         {idx + 1}
                       </td>
-                      <td className="py-2 px-3">
-                        {row.userId || (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                      <td className="py-2 px-3 font-mono text-[11px]">
+                        {row.userId || "-"}
                       </td>
-                      <td className="py-2 px-3 font-medium">
-                        {row.actionType}
-                      </td>
+                      <td className="py-2 px-3">{row.loginCount}</td>
                       <td className="py-2 px-3">
-                        {row.count != null ? row.count : "-"}
+                        {formatDateTime(row.lastLoginAt)}
                       </td>
+                      <td className="py-2 px-3">{row.workoutCount}</td>
                       <td className="py-2 px-3">
-                        {formatDateTime(row.lastActivityTime)}
+                        {formatDateTime(row.lastWorkoutAt)}
                       </td>
+                      <td className="py-2 px-3">{row.contestCount}</td>
+                      <td className="py-2 px-3">{row.dietCount}</td>
                       <td className="py-2 px-3">
-                        {shorten(row.latestNote, 80)}
-                      </td>
-                      <td className="py-2 px-3">
-                        {row.ref || row.refType ? (
-                          <span className="text-[11px]">
-                            {row.ref && (
-                              <span className="text-muted-foreground">
-                                {row.ref}
-                              </span>
-                            )}
-                            {row.ref && row.refType && " · "}
-                            {row.refType && (
-                              <span className="uppercase tracking-wide">
-                                {row.refType}
-                              </span>
-                            )}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                        {formatDateTime(row.lastUpdated)}
                       </td>
                     </tr>
                   ))}
@@ -252,4 +225,4 @@ function ActivityView() {
   );
 }
 
-export default ActivityView; 
+export default ActivityView;
