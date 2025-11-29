@@ -33,6 +33,8 @@ function ActivityView() {
 
   const docs = Array.isArray(data.docs) ? data.docs : [];
 
+  // --- helpers ---------------------------------------------------
+
   const normalizeId = (value) => {
     if (!value) return "-";
     if (typeof value === "string") return value;
@@ -63,10 +65,13 @@ function ActivityView() {
     };
   };
 
+  // --- build UI rows from your schema ----------------------------
+
   const rows = docs
     .filter((d) => d && typeof d === "object")
     .map((doc) => {
       const actions = doc.actions || {};
+
       const login = getActionStats(actions, "Login");
       const workout = getActionStats(actions, "WorkoutPlan");
       const diet = getActionStats(actions, "DietPlan");
@@ -89,16 +94,25 @@ function ActivityView() {
     });
 
   const totalLogins = rows.reduce((sum, r) => sum + (r.loginCount || 0), 0);
-  const totalWorkouts = rows.reduce((sum, r) => sum + (r.workoutCount || 0), 0);
+  const totalWorkouts = rows.reduce(
+    (sum, r) => sum + (r.workoutCount || 0),
+    0
+  );
+
+  const activeUsers = rows.filter((r) => r.loginCount > 0).length;
+
+  // --- render ----------------------------------------------------
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
-      {/* Page header */}
+      {/* VERY OBVIOUS TITLE so we know this file is live */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold">User Activity</h1>
+        <h1 className="text-3xl font-bold">
+          Activity Overview – NEW LAYOUT
+        </h1>
         <p className="text-muted-foreground text-sm">
-          Activity tracked from the <code>activities</code> collection. Each
-          row below represents one user and their overall engagement.
+          User engagement from the <code>activities</code> collection. Each row
+          shows one member&apos;s logins, workouts, diet and contest usage.
         </p>
       </div>
 
@@ -112,7 +126,9 @@ function ActivityView() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold">{data.total || rows.length}</p>
+            <p className="text-3xl font-semibold">
+              {data.total || rows.length}
+            </p>
           </CardContent>
         </Card>
 
@@ -130,9 +146,9 @@ function ActivityView() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Workout sessions</CardTitle>
+            <CardTitle className="text-sm">Workout actions</CardTitle>
             <CardDescription className="text-xs">
-              Sum of all workout plan interactions.
+              Total workout-plan interactions.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -148,20 +164,18 @@ function ActivityView() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold">
-              {rows.filter((r) => r.loginCount > 0).length}
-            </p>
+            <p className="text-3xl font-semibold">{activeUsers}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main table */}
+      {/* Table */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">User activity breakdown</CardTitle>
           <CardDescription className="text-xs">
-            High-level view of how each member is using the app – logins,
-            workout plans, diet plans and contests.
+            How each member is using the app – logins, workouts, diet and
+            contests.
           </CardDescription>
         </CardHeader>
         <CardContent>
