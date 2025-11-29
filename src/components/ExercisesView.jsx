@@ -10,6 +10,17 @@ import { fetchCollectionData } from "../api";
 
 const LEVEL_LABELS = ["Beginner", "Intermediate", "Advanced"];
 
+// Helper: does this exercise have any meaningful info?
+const hasDetails = (doc) => {
+  return (
+    doc?.name ||
+    doc?.levels ||
+    doc?.sub_categories_Name ||
+    doc?.video ||
+    doc?.description
+  );
+};
+
 function ExercisesView() {
   const [data, setData] = useState({ docs: [], total: 0 });
   const [loading, setLoading] = useState(true);
@@ -23,7 +34,8 @@ function ExercisesView() {
       try {
         setLoading(true);
         setError("");
-        const res = await fetchCollectionData("exercises", 1, 100); // load first 100 for admin view
+        // Load first 100 records for the admin view
+        const res = await fetchCollectionData("exercises", 1, 100);
         setData(res);
       } catch (err) {
         console.error("Failed to load exercises", err);
@@ -35,9 +47,13 @@ function ExercisesView() {
     load();
   }, []);
 
-  const docs = data.docs || [];
+  // Raw documents from backend
+  const rawDocs = data.docs || [];
 
-  // ---- derive some simple stats ----
+  // Only keep exercises that have at least one meaningful field
+  const docs = rawDocs.filter(hasDetails);
+
+  // ---- derive some simple stats on the cleaned list ----
   const levelCounts = docs.reduce(
     (acc, doc) => {
       const levelRaw = (doc.levels || "").toString().trim();
@@ -110,8 +126,12 @@ function ExercisesView() {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Summary</CardTitle>
             <CardDescription className="text-xs">
-              Total exercises in the <code>exercises</code> collection:{" "}
+              Total exercises in <code>exercises</code> collection:{" "}
               <span className="font-semibold">{data.total}</span>
+              <br />
+              Showing{" "}
+              <span className="font-semibold">{docs.length}</span> with
+              configured details (empty records are hidden).
             </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
@@ -195,8 +215,8 @@ function ExercisesView() {
         <CardHeader>
           <CardTitle className="text-sm">Exercises list</CardTitle>
           <CardDescription className="text-xs">
-            Showing {filteredDocs.length} of {data.total} exercises. Click the
-            video button to preview the form on YouTube.
+            Showing {filteredDocs.length} of {docs.length} detailed exercises.
+            Click the video button to preview the form on YouTube.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -238,7 +258,9 @@ function ExercisesView() {
                         {doc.name || "-"}
                       </td>
                       <td className="py-2 px-3">
-                        {doc.levels || <span className="text-muted-foreground">-</span>}
+                        {doc.levels || (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </td>
                       <td className="py-2 px-3">
                         {doc.sub_categories_Name || "-"}
