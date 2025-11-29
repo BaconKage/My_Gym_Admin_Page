@@ -64,7 +64,7 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
       description: "Entries in the Daily Steps log.",
       icon: TrendingUp,
       color: "text-green-500",
-      gradient: "from-green-500/10 to-green-600/10",
+      gradient: "from-emerald-500/10 to-emerald-600/10",
     },
     {
       id: "challenges",
@@ -73,7 +73,7 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
       description: "Currently running fitness challenges.",
       icon: Trophy,
       color: "text-yellow-500",
-      gradient: "from-yellow-500/10 to-yellow-600/10",
+      gradient: "from-amber-500/10 to-amber-600/10",
     },
     {
       id: "workouts",
@@ -82,7 +82,7 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
       description: "Exercises available in the library.",
       icon: Dumbbell,
       color: "text-purple-500",
-      gradient: "from-purple-500/10 to-purple-600/10",
+      gradient: "from-violet-500/10 to-violet-600/10",
     },
     {
       id: "carts",
@@ -104,19 +104,45 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
     },
   ];
 
-  // Data for the simple bar chart
+  // Data for the simple bar chart, including explicit gradients
   const chartData = [
-    { key: "Activities", value: safeStats.totalActivities },
-    { key: "Steps", value: safeStats.totalDailyStepsRecords },
-    { key: "Challenges", value: safeStats.activeChallenges },
-    { key: "Exercises", value: safeStats.totalExercises },
-    { key: "Carts", value: safeStats.openCarts },
-    { key: "Conversations", value: safeStats.totalConversations },
+    {
+      key: "Activities",
+      value: safeStats.totalActivities,
+      gradient: "from-blue-500/70 to-blue-400/90",
+    },
+    {
+      key: "Steps",
+      value: safeStats.totalDailyStepsRecords,
+      gradient: "from-emerald-500/70 to-emerald-400/90",
+    },
+    {
+      key: "Challenges",
+      value: safeStats.activeChallenges,
+      gradient: "from-amber-500/70 to-amber-400/90",
+    },
+    {
+      key: "Exercises",
+      value: safeStats.totalExercises,
+      gradient: "from-violet-500/70 to-violet-400/90",
+    },
+    {
+      key: "Carts",
+      value: safeStats.openCarts,
+      gradient: "from-orange-500/70 to-orange-400/90",
+    },
+    {
+      key: "Conversations",
+      value: safeStats.totalConversations,
+      gradient: "from-pink-500/70 to-pink-400/90",
+    },
   ];
 
   const maxValue =
-    chartData.reduce((max, item) => (item.value > max ? item.value : max), 0) ||
-    1;
+    chartData.reduce(
+      (max, item) => (item.value > max ? item.value : max),
+      0
+    ) || 1;
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-8">
@@ -176,7 +202,7 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mt-4 flex items-end gap-4 h-48">
+            <div className="mt-4 flex items-end gap-4 h-48 px-2">
               {chartData.map((item) => {
                 const height = (item.value / maxValue) * 100;
                 return (
@@ -184,13 +210,13 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
                     key={item.key}
                     className="flex-1 flex flex-col items-center justify-end gap-2"
                   >
-                    <div className="flex flex-col items-center gap-1">
+                    <div className="flex flex-col items-center gap-1 w-full">
                       <div
-                        className="w-full rounded-t-lg bg-gradient-to-t from-primary/40 to-primary/80 transition-all"
+                        className={`w-full rounded-t-lg bg-gradient-to-t ${item.gradient} transition-all duration-300`}
                         style={{ height: `${height || 5}%` }}
                       />
                     </div>
-                    <div className="text-[11px] text-muted-foreground text-center leading-tight">
+                    <div className="text-[11px] text-muted-foreground text-center leading-tight mt-1">
                       {item.key}
                     </div>
                     <div className="text-xs font-semibold text-foreground">
@@ -251,7 +277,7 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
             <div className="flex items-center justify-between rounded-lg bg-slate-500/5 border border-slate-500/20 px-3 py-2">
               <div>
                 <p className="font-medium text-slate-200">
-                  Conversations & support
+                  Conversations &amp; support
                 </p>
                 <p className="text-[11px] text-slate-100/80">
                   {safeStats.totalConversations.toLocaleString()} conversations
