@@ -18,7 +18,7 @@ function ChallengesView() {
       try {
         setLoading(true);
         setError("");
-        const res = await fetchCollectionData("challenges", 1, 50);
+        const res = await fetchCollectionData("challengesworks", 1, 50);
         setData(res);
       } catch (err) {
         console.error("Failed to load challenges", err);
