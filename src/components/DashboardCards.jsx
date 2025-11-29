@@ -104,37 +104,37 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
     },
   ];
 
-  // Data for the simple bar chart, including explicit gradients
+  // Very simple bar-chart data: plain bg-* classes
   const chartData = [
     {
       key: "Activities",
       value: safeStats.totalActivities,
-      gradient: "from-blue-500/70 to-blue-400/90",
+      barClass: "bg-blue-500",
     },
     {
       key: "Steps",
       value: safeStats.totalDailyStepsRecords,
-      gradient: "from-emerald-500/70 to-emerald-400/90",
+      barClass: "bg-emerald-500",
     },
     {
       key: "Challenges",
       value: safeStats.activeChallenges,
-      gradient: "from-amber-500/70 to-amber-400/90",
+      barClass: "bg-amber-500",
     },
     {
       key: "Exercises",
       value: safeStats.totalExercises,
-      gradient: "from-violet-500/70 to-violet-400/90",
+      barClass: "bg-violet-500",
     },
     {
       key: "Carts",
       value: safeStats.openCarts,
-      gradient: "from-orange-500/70 to-orange-400/90",
+      barClass: "bg-orange-500",
     },
     {
       key: "Conversations",
       value: safeStats.totalConversations,
-      gradient: "from-pink-500/70 to-pink-400/90",
+      barClass: "bg-pink-500",
     },
   ];
 
@@ -202,9 +202,11 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mt-4 flex items-end gap-4 h-48 px-2">
+            <div className="mt-4 flex items-end gap-4 h-48 px-4">
               {chartData.map((item) => {
-                const height = (item.value / maxValue) * 100;
+                const ratio = item.value / maxValue;
+                const heightPct = Math.max(ratio * 100, 8); // minimum 8% so bar is visible
+
                 return (
                   <div
                     key={item.key}
@@ -212,8 +214,8 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
                   >
                     <div className="flex flex-col items-center gap-1 w-full">
                       <div
-                        className={`w-full rounded-t-lg bg-gradient-to-t ${item.gradient} transition-all duration-300`}
-                        style={{ height: `${height || 5}%` }}
+                        className={`w-full rounded-t-lg ${item.barClass}`}
+                        style={{ height: `${heightPct}%` }}
                       />
                     </div>
                     <div className="text-[11px] text-muted-foreground text-center leading-tight mt-1">
