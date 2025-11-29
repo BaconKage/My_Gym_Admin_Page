@@ -51,8 +51,8 @@ const TopNav = ({ activePage, onNavigate }) => {
           {/* User Profile */}
           <div className="flex items-center gap-3">
             <div className="hidden sm:block text-right">
-              <p className="text-sm font-medium">Admin User</p>
-              <p className="text-xs text-muted-foreground">admin@mygym.com</p>
+              <p className="text-sm font-medium">Admin View</p>
+              <p className="text-xs text-muted-foreground">MY GYM/p>
             </div>
             <Avatar>
               <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
