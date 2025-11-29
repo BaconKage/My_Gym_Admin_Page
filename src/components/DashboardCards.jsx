@@ -201,8 +201,8 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
         setCollectionsLoading(false);
       }
     }
+
     loadMeta();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once
 
   // load docs for selected collection
@@ -289,6 +289,7 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
           const c = parsed.Contest;
           const parts = [];
           if (c.activity) parts.push(c.activity);
+          if (c.status) parts.push(c.status);
           if (c.lastActivityTime) {
             const d = new Date(c.lastActivityTime);
             if (!isNaN(d)) parts.push(d.toLocaleString());
