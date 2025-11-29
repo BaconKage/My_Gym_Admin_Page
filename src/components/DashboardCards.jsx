@@ -39,6 +39,41 @@ const IMPORTANT_COLLECTIONS = [
   "exercisesubcategories",
 ];
 
+// Human-friendly collection labels for the sidebar
+const COLLECTION_LABELS = {
+  activities: "User Activities",
+  activityfeeds: "Activity Feed",
+  attendances: "Trainer Attendance",
+  auditlogs: "Audit Logs",
+  audittrails: "Audit Trails",
+  blogs: "Blogs",
+  bmrs: "BMR Records",
+  carts: "Shopping Carts",
+  certifications: "Certifications",
+  challenges: "Challenges",
+  challengesworks: "Challenge Workouts",
+  chatmembers: "Chat Members",
+  commonpages: "Static Pages",
+  conversations: "Conversations",
+  createmembershiptokens: "Membership Tokens",
+  dailysteps: "Daily Steps",
+  exercisecategories: "Exercise Categories",
+  exerciselevels: "Exercise Levels",
+  exercises: "Exercises Library",
+  exercisesubcategories: "Exercise Sub-categories",
+};
+
+// Which columns to show for each important collection
+const COLLECTION_COLUMN_CONFIG = {
+  activities: ["userId", "actions", "lastUpdated", "createdAt"],
+  dailysteps: ["userId", "today_steps", "date"],
+  exercises: ["name", "description", "levels", "sub_categories_Name", "video"],
+  challenges: ["name", "description", "start_at", "end_at", "entry_fees"],
+  carts: ["userId", "status", "total_amount", "updatedAt"],
+  conversations: ["members", "lastMessage", "updatedAt"],
+  // add more per collection as needed
+};
+
 function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
   // ---- dashboard stats (already wired to backend) ----
   if (statsLoading && !stats) {
@@ -167,6 +202,7 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
       }
     }
     loadMeta();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once
 
   // load docs for selected collection
@@ -191,29 +227,96 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
   }, [selectedCollection]);
 
   const docs = selectedData.docs || [];
+
   const columnKeys =
     docs.length > 0
-      ? Array.from(
-          new Set(
-            docs.flatMap((doc) =>
-              Object.keys(doc).filter(
-                (k) => k !== "_id" && !k.startsWith("__")
+      ? (() => {
+          const configured = COLLECTION_COLUMN_CONFIG[selectedCollection] || null;
+
+          if (configured) {
+            // Only include keys that actually exist in at least one doc
+            return configured.filter((key) =>
+              docs.some((doc) =>
+                Object.prototype.hasOwnProperty.call(doc, key)
+              )
+            );
+          }
+
+          // Fallback: generic auto-detected keys (old behaviour)
+          return Array.from(
+            new Set(
+              docs.flatMap((doc) =>
+                Object.keys(doc).filter(
+                  (k) => k !== "_id" && !k.startsWith("__")
+                )
               )
             )
-          )
-        ).slice(0, 6)
+          ).slice(0, 6);
+        })()
       : [];
 
-  const formatCell = (value) => {
-    if (value == null) return "-";
-    if (typeof value === "object") {
+  const formatCell = (key, value) => {
+    if (value == null || value === "") return "-";
+
+    // Date-like fields
+    if (
+      [
+        "createdAt",
+        "updatedAt",
+        "lastUpdated",
+        "start_at",
+        "end_at",
+        "date",
+      ].includes(key)
+    ) {
+      const d = new Date(value);
+      if (!isNaN(d)) return d.toLocaleString();
+    }
+
+    // Money / entry fees
+    if (key === "entry_fees") {
+      const num = Number(value);
+      if (!num) return "Free";
+      return `₹ ${num.toLocaleString()}`;
+    }
+
+    // Activities JSON blob – show something human friendly
+    if (key === "actions") {
       try {
-        const str = JSON.stringify(value);
-        return str.length > 60 ? str.slice(0, 57) + "..." : str;
+        const parsed = typeof value === "string" ? JSON.parse(value) : value;
+
+        if (parsed.Contest) {
+          const c = parsed.Contest;
+          const parts = [];
+          if (c.activity) parts.push(c.activity);
+          if (c.lastActivityTime) {
+            const d = new Date(c.lastActivityTime);
+            if (!isNaN(d)) parts.push(d.toLocaleString());
+          }
+          return parts.join(" • ") || "Contest activity";
+        }
+
+        const str = JSON.stringify(parsed);
+        return str.length > 80 ? str.slice(0, 77) + "..." : str;
       } catch {
-        return "[object]";
+        const str = String(value);
+        return str.length > 80 ? str.slice(0, 77) + "..." : str;
       }
     }
+
+    // Arrays – show counts instead of raw JSON
+    if (Array.isArray(value)) {
+      if (key === "members") {
+        return `${value.length} member${value.length === 1 ? "" : "s"}`;
+      }
+      return value.length ? `${value.length} item(s)` : "-";
+    }
+
+    // Generic object
+    if (typeof value === "object") {
+      return "[data]";
+    }
+
     const str = String(value);
     return str.length > 60 ? str.slice(0, 57) + "..." : str;
   };
@@ -270,8 +373,8 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-semibold">Collections overview</h3>
           <p className="text-xs text-muted-foreground">
-            Showing key collections from the <code>my_gym</code> database.
-            Click a row to preview documents.
+            Showing key collections from the <code>my_gym</code> database. Click
+            a row to preview records.
           </p>
         </div>
 
@@ -315,7 +418,9 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
                           }`}
                           onClick={() => setSelectedCollection(c.name)}
                         >
-                          <td className="py-2 px-4 font-medium">{c.name}</td>
+                          <td className="py-2 px-4 font-medium">
+                            {COLLECTION_LABELS[c.name] || c.name}
+                          </td>
                           <td className="py-2 px-4 text-right">
                             {c.count.toLocaleString()}
                           </td>
@@ -343,12 +448,16 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
             <CardHeader>
               <CardTitle className="text-sm">
                 {selectedCollection
-                  ? `Preview: ${selectedCollection}`
+                  ? `Preview: ${
+                      COLLECTION_LABELS[selectedCollection] ||
+                      selectedCollection
+                    }`
                   : "Preview"}
               </CardTitle>
               <CardDescription className="text-xs">
-                Showing up to {selectedData.limit} most recent documents. This
-                is a read-only preview to help admins understand the data shape.
+                Showing up to {selectedData.limit} recent records from this
+                module. Values are read-only and meant to give admins a quick
+                overview.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
@@ -388,7 +497,7 @@ function DashboardCards({ onCardClick, stats, statsLoading, statsError }) {
                           </td>
                           {columnKeys.map((key) => (
                             <td key={key} className="py-2 px-3">
-                              {formatCell(doc[key])}
+                              {formatCell(key, doc[key])}
                             </td>
                           ))}
                         </tr>
