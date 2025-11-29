@@ -8,13 +8,29 @@ import {
 } from "./ui/card";
 import { fetchCollectionData } from "../api";
 
-const BASE_COLUMNS = ["userId", "actions", "lastUpdated", "createdAt"];
+const normalizeDate = (value) => {
+  if (!value) return null;
+  if (value.$date) return new Date(value.$date);
+  if (typeof value === "string" || value instanceof Date) return new Date(value);
+  return null;
+};
 
-const COLUMN_LABELS = {
-  userId: "User",
-  actions: "Activity",
-  lastUpdated: "Last Updated",
-  createdAt: "Created At",
+const formatDateTime = (value) => {
+  const d = normalizeDate(value);
+  if (!d || isNaN(d.getTime())) return "-";
+  return d.toLocaleString("en-IN", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const shorten = (str, max = 80) => {
+  if (!str) return "-";
+  if (str.length <= max) return str;
+  return str.slice(0, max - 3) + "...";
 };
 
 function ActivityView() {
@@ -27,6 +43,7 @@ function ActivityView() {
       try {
         setLoading(true);
         setError("");
+        // activities collection
         const res = await fetchCollectionData("activities", 1, 50);
         setData(res);
       } catch (err) {
@@ -41,79 +58,114 @@ function ActivityView() {
 
   const docs = data.docs || [];
 
-  // Only show the columns we care about, and only if they exist in at least one doc
-  const columnKeys =
-    docs.length > 0
-      ? BASE_COLUMNS.filter((key) =>
-          docs.some((doc) => Object.prototype.hasOwnProperty.call(doc, key))
-        )
-      : [];
+  // Flatten each document (one per user) into user-action rows
+  const rows = docs.flatMap((doc) => {
+    const userId =
+      doc.userId?._id ||
+      doc.userId?.$oid ||
+      doc.userId ||
+      doc.userid ||
+      doc.user_id;
 
-  const formatCell = (key, value) => {
-    if (value == null || value === "") return "-";
+    const actions = doc.actions || {};
+    return Object.entries(actions).map(([actionType, info]) => {
+      const count = info?.count ?? 0;
+      const lastActivityTime = info?.lastActivityTime;
+      const notes = Array.isArray(info?.notes) ? info.notes : [];
+      const latestNote = notes[notes.length - 1] || null;
+      const ref =
+        info?.ref?._id || info?.ref?.$oid || info?.ref || null;
+      const refType = info?.refType || null;
 
-    // Date-like fields
-    if (["createdAt", "updatedAt", "lastUpdated"].includes(key)) {
-      const d = new Date(value);
-      if (!isNaN(d)) return d.toLocaleString();
+      return {
+        userId,
+        actionType,
+        count,
+        lastActivityTime,
+        latestNote,
+        ref,
+        refType,
+        docId: doc._id?._id || doc._id?.$oid || doc._id,
+      };
+    });
+  });
+
+  // Summary stats
+  const summary = rows.reduce(
+    (acc, row) => {
+      if (row.userId) acc.userIds.add(String(row.userId));
+      acc.totalEvents += Number(row.count) || 0;
+      acc.actionTypes.add(row.actionType);
+      return acc;
+    },
+    {
+      userIds: new Set(),
+      totalEvents: 0,
+      actionTypes: new Set(),
     }
+  );
 
-    // Activities JSON blob – show something human friendly
-    if (key === "actions") {
-      try {
-        const parsed = typeof value === "string" ? JSON.parse(value) : value;
-
-        // Adjust this block based on your real structure
-        if (parsed.Contest) {
-          const c = parsed.Contest;
-          const parts = [];
-          if (c.activity) parts.push(c.activity);
-          if (c.status) parts.push(c.status);
-          if (c.lastActivityTime) {
-            const d = new Date(c.lastActivityTime);
-            if (!isNaN(d)) parts.push(d.toLocaleString());
-          }
-          return parts.length ? parts.join(" • ") : "Contest activity";
-        }
-
-        const str = JSON.stringify(parsed);
-        return str.length > 80 ? str.slice(0, 77) + "…" : str;
-      } catch {
-        const str = String(value);
-        return str.length > 80 ? str.slice(0, 77) + "…" : str;
-      }
-    }
-
-    // Arrays – show counts instead of raw JSON
-    if (Array.isArray(value)) {
-      return value.length ? `${value.length} item(s)` : "-";
-    }
-
-    // Generic object
-    if (typeof value === "object") {
-      return "[data]";
-    }
-
-    const str = String(value);
-    return str.length > 60 ? str.slice(0, 57) + "…" : str;
-  };
+  const totalUsersWithActivity = summary.userIds.size;
+  const totalActionTypes = summary.actionTypes.size;
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
+      {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">Activity Overview</h1>
         <p className="text-muted-foreground text-sm">
-          Live view of recent user activities from the <code>activities</code>{" "}
-          collection.
+          Per-user activity summary from the <code>activities</code>{" "}
+          collection. Each row below shows one type of action (Login,
+          WorkoutPlan, Contest, etc.) for a specific user.
         </p>
       </div>
 
+      {/* Summary card */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="text-lg">Summary</CardTitle>
           <CardDescription className="text-xs">
-            Total records in <code>activities</code>:{" "}
+            Raw documents in <code>activities</code>:{" "}
             <span className="font-semibold">{data.total}</span>
+            <br />
+            Flattened view below combines user &amp; action type into readable
+            rows for admins.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="rounded-lg bg-slate-800/60 border border-slate-700/70 px-3 py-2">
+            <p className="text-[11px] text-muted-foreground mb-1">
+              Users with activity
+            </p>
+            <p className="text-base font-semibold">
+              {totalUsersWithActivity}
+            </p>
+          </div>
+          <div className="rounded-lg bg-blue-500/5 border border-blue-500/30 px-3 py-2">
+            <p className="text-[11px] text-blue-100 mb-1">Total events</p>
+            <p className="text-base font-semibold text-blue-200">
+              {summary.totalEvents.toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-lg bg-violet-500/5 border border-violet-500/30 px-3 py-2">
+            <p className="text-[11px] text-violet-100 mb-1">
+              Different action types
+            </p>
+            <p className="text-base font-semibold text-violet-200">
+              {totalActionTypes}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Detailed table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">User activity breakdown</CardTitle>
+          <CardDescription className="text-xs">
+            One row per user per action type. Counts come from the{" "}
+            <code>actions.&lt;Type&gt;.count</code> field. The latest note is
+            taken from the action&apos;s notes array.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -125,7 +177,7 @@ function ActivityView() {
             <div className="py-4 text-sm text-red-200 bg-red-500/10 border border-red-500/40 rounded-lg">
               {error}
             </div>
-          ) : docs.length === 0 ? (
+          ) : rows.length === 0 ? (
             <div className="py-6 text-sm text-muted-foreground">
               No activity records found.
             </div>
@@ -135,27 +187,59 @@ function ActivityView() {
                 <thead>
                   <tr className="border-b border-border/60 text-[11px] text-muted-foreground">
                     <th className="text-left py-2 px-3">#</th>
-                    {columnKeys.map((key) => (
-                      <th key={key} className="text-left py-2 px-3">
-                        {COLUMN_LABELS[key] || key}
-                      </th>
-                    ))}
+                    <th className="text-left py-2 px-3">User</th>
+                    <th className="text-left py-2 px-3">Action type</th>
+                    <th className="text-left py-2 px-3">Count</th>
+                    <th className="text-left py-2 px-3">Last activity</th>
+                    <th className="text-left py-2 px-3">Latest note</th>
+                    <th className="text-left py-2 px-3">Ref / Type</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {docs.map((doc, idx) => (
+                  {rows.map((row, idx) => (
                     <tr
-                      key={doc._id || idx}
+                      key={`${row.docId || "doc"}-${row.actionType}-${idx}`}
                       className="border-b border-border/40 last:border-0"
                     >
                       <td className="py-2 px-3 text-muted-foreground">
                         {idx + 1}
                       </td>
-                      {columnKeys.map((key) => (
-                        <td key={key} className="py-2 px-3">
-                          {formatCell(key, doc[key])}
-                        </td>
-                      ))}
+                      <td className="py-2 px-3">
+                        {row.userId || (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 font-medium">
+                        {row.actionType}
+                      </td>
+                      <td className="py-2 px-3">
+                        {row.count != null ? row.count : "-"}
+                      </td>
+                      <td className="py-2 px-3">
+                        {formatDateTime(row.lastActivityTime)}
+                      </td>
+                      <td className="py-2 px-3">
+                        {shorten(row.latestNote, 80)}
+                      </td>
+                      <td className="py-2 px-3">
+                        {row.ref || row.refType ? (
+                          <span className="text-[11px]">
+                            {row.ref && (
+                              <span className="text-muted-foreground">
+                                {row.ref}
+                              </span>
+                            )}
+                            {row.ref && row.refType && " · "}
+                            {row.refType && (
+                              <span className="uppercase tracking-wide">
+                                {row.refType}
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
