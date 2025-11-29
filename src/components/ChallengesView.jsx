@@ -298,4 +298,4 @@ function ChallengesView() {
   );
 }
 
-export default ChallengesView;
+export default ChallengesView; 
