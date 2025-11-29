@@ -8,6 +8,16 @@ import {
 } from "./ui/card";
 import { fetchCollectionData } from "../api";
 
+// Columns we actually care about for daily steps
+const BASE_COLUMNS = ["userId", "today_steps", "date", "createdAt"];
+
+const COLUMN_LABELS = {
+  userId: "User",
+  today_steps: "Steps Today",
+  date: "Date",
+  createdAt: "Created At",
+};
+
 function StepsView() {
   const [data, setData] = useState({ docs: [], total: 0 });
   const [loading, setLoading] = useState(true);
@@ -31,31 +41,43 @@ function StepsView() {
   }, []);
 
   const docs = data.docs || [];
+
+  // Only show the columns we care about, and only if they exist in at least one doc
   const columnKeys =
     docs.length > 0
-      ? Array.from(
-          new Set(
-            docs.flatMap((doc) =>
-              Object.keys(doc).filter(
-                (k) => k !== "_id" && !k.startsWith("__")
-              )
-            )
-          )
-        ).slice(0, 6)
+      ? BASE_COLUMNS.filter((key) =>
+          docs.some((doc) => Object.prototype.hasOwnProperty.call(doc, key))
+        )
       : [];
 
-  const formatCell = (value) => {
-    if (value == null) return "-";
-    if (typeof value === "object") {
-      try {
-        const str = JSON.stringify(value);
-        return str.length > 60 ? str.slice(0, 57) + "..." : str;
-      } catch {
-        return "[object]";
-      }
+  const formatCell = (key, value) => {
+    if (value == null || value === "") return "-";
+
+    // Date-like fields
+    if (["date", "createdAt", "updatedAt"].includes(key)) {
+      const d = new Date(value);
+      if (!isNaN(d)) return d.toLocaleString();
     }
+
+    // Steps count
+    if (key === "today_steps") {
+      const num = Number(value);
+      if (isNaN(num)) return String(value);
+      return num.toLocaleString();
+    }
+
+    // Arrays – show counts instead of raw JSON
+    if (Array.isArray(value)) {
+      return value.length ? `${value.length} item(s)` : "-";
+    }
+
+    // Generic object
+    if (typeof value === "object") {
+      return "[data]";
+    }
+
     const str = String(value);
-    return str.length > 60 ? str.slice(0, 57) + "..." : str;
+    return str.length > 60 ? str.slice(0, 57) + "…" : str;
   };
 
   return (
@@ -63,7 +85,8 @@ function StepsView() {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">Daily Steps</h1>
         <p className="text-muted-foreground text-sm">
-          Live view of documents from the <code>dailysteps</code> collection.
+          Live view of recent step records from the <code>dailysteps</code>{" "}
+          collection.
         </p>
       </div>
 
@@ -96,7 +119,7 @@ function StepsView() {
                     <th className="text-left py-2 px-3">#</th>
                     {columnKeys.map((key) => (
                       <th key={key} className="text-left py-2 px-3">
-                        {key}
+                        {COLUMN_LABELS[key] || key}
                       </th>
                     ))}
                   </tr>
@@ -112,7 +135,7 @@ function StepsView() {
                       </td>
                       {columnKeys.map((key) => (
                         <td key={key} className="py-2 px-3">
-                          {formatCell(doc[key])}
+                          {formatCell(key, doc[key])}
                         </td>
                       ))}
                     </tr>
