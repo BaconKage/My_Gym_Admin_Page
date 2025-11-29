@@ -18,18 +18,15 @@ const normalizeId = (value) => {
 const normalizeCreatedAt = (value) => {
   if (!value) return null;
 
-  // { $numberLong: "1734359170832" }
   if (typeof value === "object" && value.$numberLong) {
     const ms = parseInt(value.$numberLong, 10);
     if (!Number.isNaN(ms)) return new Date(ms);
   }
 
-  // plain number (ms)
   if (typeof value === "number") {
     return new Date(value);
   }
 
-  // ISO string or other date-like string
   if (typeof value === "string") {
     const d = new Date(value);
     if (!Number.isNaN(d.getTime())) return d;
@@ -67,7 +64,6 @@ function ChallengesView() {
       try {
         setLoading(true);
         setError("");
-        // ✅ use challengesworks as the source collection
         const res = await fetchCollectionData("challengesworks", 1, 50);
         setData(res);
       } catch (err) {
@@ -80,9 +76,10 @@ function ChallengesView() {
     load();
   }, []);
 
-  const docs = (data.docs || []).filter((d) => d && Object.keys(d).length);
+  const docs = (data.docs || []).filter(
+    (d) => d && Object.keys(d).length > 0
+  );
 
-  // Build nice rows based on your schema
   const rows = docs.map((doc) => {
     const challengeId = normalizeId(doc.challenge);
     const userId = normalizeId(doc.user);
@@ -93,9 +90,7 @@ function ChallengesView() {
     const video = doc.video;
 
     return {
-      id:
-        normalizeId(doc._id) ||
-        `${challengeId || "challenge"}-${userId || "user"}`,
+      id: normalizeId(doc._id) || `${challengeId || "challenge"}-${userId || "user"}`,
       challengeId,
       userId,
       description,
@@ -106,7 +101,6 @@ function ChallengesView() {
     };
   });
 
-  // Summary stats
   const summary = rows.reduce(
     (acc, row) => {
       if (row.challengeId) acc.challengeIds.add(row.challengeId);
@@ -114,11 +108,7 @@ function ChallengesView() {
       if (row.deletedAt) acc.deletedCount += 1;
       return acc;
     },
-    {
-      challengeIds: new Set(),
-      userIds: new Set(),
-      deletedCount: 0,
-    }
+    { challengeIds: new Set(), userIds: new Set(), deletedCount: 0 }
   );
 
   const totalRecords = data.total;
@@ -127,19 +117,14 @@ function ChallengesView() {
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
-      {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">Challenges</h1>
         <p className="text-muted-foreground text-sm">
-          Each row represents a{" "}
-          <span className="font-semibold">user&apos;s entry</span> in a
-          challenge from the <code>challengesworks</code> collection. Admins
-          can quickly see who joined which challenge, when it was created, and
-          whether an image or video was uploaded.
+          Each row represents a <span className="font-semibold">user&apos;s entry</span>{" "}
+          in a challenge from the <code>challengesworks</code> collection.
         </p>
       </div>
 
-      {/* Summary card */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Summary</CardTitle>
@@ -156,9 +141,7 @@ function ChallengesView() {
             <p className="text-base font-semibold">{rows.length}</p>
           </div>
           <div className="rounded-lg bg-blue-500/5 border border-blue-500/40 px-3 py-2">
-            <p className="text-[11px] text-blue-100 mb-1">
-              Unique challenges
-            </p>
+            <p className="text-[11px] text-blue-100 mb-1">Unique challenges</p>
             <p className="text-base font-semibold text-blue-200">
               {uniqueChallenges}
             </p>
@@ -180,16 +163,13 @@ function ChallengesView() {
         </CardContent>
       </Card>
 
-      {/* Detailed table */}
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Challenge entries</CardTitle>
           <CardDescription className="text-xs">
-            Description and media come directly from{" "}
-            <code>description</code>, <code>image</code>, and{" "}
-            <code>video</code> fields in MongoDB. Use these IDs if you need to
-            cross-check in the main <code>challenges</code> or{" "}
-            <code>users</code> collections.
+            Description and media come from <code>description</code>,{" "}
+            <code>image</code> and <code>video</code> in{" "}
+            <code>challengesworks</code>.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -230,14 +210,10 @@ function ChallengesView() {
                         {idx + 1}
                       </td>
                       <td className="py-2 px-3 font-mono text-[11px]">
-                        {row.userId || (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                        {row.userId || "-"}
                       </td>
                       <td className="py-2 px-3 font-mono text-[11px]">
-                        {row.challengeId || (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                        {row.challengeId || "-"}
                       </td>
                       <td className="py-2 px-3">
                         {formatShortText(row.description, 80)}
